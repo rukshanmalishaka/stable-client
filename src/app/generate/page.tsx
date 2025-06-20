@@ -3,7 +3,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import axios from 'axios';
 
-const API_BASE = 'http://213.180.0.35:47909';
+const API_BASE = 'https://213.180.0.35:47909';
 const DOWNLOAD_BASE = `${API_BASE}/download`;
 
 const axiosClient = axios.create({
