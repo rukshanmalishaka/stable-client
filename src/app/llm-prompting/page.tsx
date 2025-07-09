@@ -1,31 +1,99 @@
-const page = () => {
-    return (
-        <div className="container mx-auto px-20 py-24 items-center">
-            <div className="p-4 rounded-lg">
-                <textarea
-                    className="w-full h-32 p-2 bg-[#252525] rounded-lg border border-gray-600 focus:outline-none focus:ring-1 focus:ring-gray-400"
-                    placeholder="Type here..."
-                />
-            </div>
-            <div className="grid grid-cols-2 gap-12 pb-20">
-                <div>
-                    <div className="text-white">Thinking Process</div>
-                    <div className="text-white p-2 rounded-lg border border-gray-600 text-base font-normal mt-2">
-                        The user inputs “a futuristic city at night.” DeepSeek immediately begins analyzing the prompt, identifying key concepts such as “futuristic,” “city,” and “night.” It recognizes that the prompt is too vague—“futuristic” could mean cyberpunk, utopian, or high-tech, while “city” could refer to a wide skyline, a street-level view, or a sprawling metropolis. To optimize the prompt, DeepSeek retrieves contextual knowledge from its dataset, enhancing it with more descriptive elements. It restructures the input into a more precise format, ensuring the diffusion model fully understands the user’s intent. The AI refines the prompt into: “A breathtaking cyberpunk city at night, illuminated by neon lights and holographic billboards, with towering skyscrapers, flying cars, and a futuristic urban glow.” Now, DeepSeek evaluates the model’s response. If the generated image lacks key details—perhaps the atmosphere is too dark, or the skyline isn’t detailed enough—it iterates, adjusting brightness, refining object placement, or enhancing stylistic choices to align with the intended vision. The final output is a stunning, highly detailed futuristic cityscape, perfectly crafted from an optimized, AI-friendly prompt.
-                    </div>
-                </div>
+"use client";
+import React, { useState } from "react";
 
-                <div className="mt-6">
-                    <p className="text-white font-normal text-xl">“A sprawling cyberpunk city at night, filled with towering glass skyscrapers, neon-lit streets, flying vehicles, and glowing billboards. The sky is dark with a subtle purple haze, reflecting the city’s vibrant lights. The scene is detailed and cinematic, with a futuristic yet gritty atmosphere.”</p>
+export default function Page() {
+  const [prompt, setPrompt] = useState("");
+  const [thought, setThought] = useState("");
+  const [response, setResponse] = useState("");
+  const [loading, setLoading] = useState(false);
 
-                    <div className="mt-40">
-                        <button className="box w-full py-2 ">AI Prompt Assist</button>
-                        <button className="box w-full py-2 mt-4">Generate Now</button>
-                    </div>
-                </div>
+  const handleSubmit = async () => {
+    setThought("");
+    setResponse("");
+    setLoading(true);
 
-            </div>
+    const formData = new FormData();
+    formData.append("prompt", prompt);
+
+    try {
+      const res = await fetch("http://213.180.0.35:47909/llm/", {
+        method: "POST",
+        body: formData,
+      });
+
+      const reader = res.body?.getReader();
+      const decoder = new TextDecoder("utf-8");
+
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        let lines = buffer.split("\n");
+        buffer = lines.pop() || ""; // keep unfinished line
+
+        for (let line of lines) {
+          line = line.trim();
+          if (!line) continue;
+
+          try {
+            // ✅ Strip the 'data:' prefix if present
+            if (line.startsWith("data:")) {
+              line = line.slice(5).trim();
+            }
+
+            const json = JSON.parse(line);
+            if (json.thought) setThought((prev) => prev + json.thought);
+            if (json.response) setResponse((prev) => prev + json.response);
+          } catch (err) {
+            console.warn("Failed to parse line:", line);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Stream error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="container mx-auto px-20 py-24">
+      <div className="p-4 rounded-lg">
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          className="w-full h-32 p-2 bg-[#252525] text-white rounded-lg border border-gray-600 focus:outline-none"
+          placeholder="Type here..."
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-12 pb-20">
+        <div>
+          <div className="text-white">Thinking Process</div>
+          <div className="text-white whitespace-pre-wrap mt-2 border border-gray-600 p-2 rounded-lg">
+            {thought || "Waiting for AI..."}
+          </div>
         </div>
-    )
+
+        <div className="mt-6">
+          <div className="text-white whitespace-pre-wrap text-lg">
+            {response || "AI response will appear here..."}
+          </div>
+          <div className="mt-40">
+            <button
+              className="box w-full py-2"
+              onClick={handleSubmit}
+              disabled={loading}
+            >
+              {loading ? "Generating..." : "Generate Now"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
-export default page;
